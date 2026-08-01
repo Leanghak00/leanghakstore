@@ -4,20 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Leanghak Store - Dynamic KHQR & AI Pro Store</title>
-    <!-- Tailwind CSS -->
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
         body {
             font-family: 'Plus Jakarta Sans', 'Kantumruy Pro', sans-serif;
             -webkit-tap-highlight-color: transparent;
-            background-color: #030712;
         }
         .mesh-bg {
             background: radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.2) 0px, transparent 50%),
@@ -29,37 +31,38 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
+        .dark .glass-card {
+            background: rgba(15, 23, 42, 0.85);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
         .glow-effect {
             box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.5);
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-800 antialiased min-h-screen pb-16 select-none mesh-bg">
+<body class="bg-slate-950 text-slate-800 dark:text-slate-100 antialiased min-h-screen pb-16 select-none mesh-bg transition-colors duration-300">
 
-    <!-- Ambient Background Orbs -->
     <div class="fixed top-[-10%] left-[-10%] w-80 h-80 bg-blue-600/25 rounded-full blur-[120px] pointer-events-none"></div>
     <div class="fixed bottom-[-10%] right-[-10%] w-80 h-80 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none"></div>
 
-    <!-- Main Container -->
     <div class="max-w-md mx-auto px-4 pt-5 relative z-10">
-
-        <!-- User Auth Bar / Header Bar -->
-        <div class="flex items-center justify-between mb-4 bg-white/10 p-2.5 rounded-2xl backdrop-blur-md border border-white/10">
-            <div id="userProfileArea" class="flex items-center gap-2">
-                <!-- Javascript Dynamic User State -->
-            </div>
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-4 bg-white/10 dark:bg-slate-900/40 p-2.5 rounded-2xl backdrop-blur-md border border-white/10">
+            <div id="userProfileArea" class="flex items-center gap-2"></div>
             <div class="flex items-center gap-1.5">
-                <button onclick="openHistoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-amber-400 flex items-center justify-center text-xs font-bold" title="ប្រវត្តិការបញ្ជាទិញ">
+                <button onclick="toggleDarkMode()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 flex items-center justify-center text-xs font-bold">
+                    <i id="themeIcon" class="fa-solid fa-moon"></i>
+                </button>
+                <button onclick="openHistoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-amber-400 flex items-center justify-center text-xs font-bold">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                 </button>
-                <button onclick="openAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-blue-400 flex items-center justify-center text-xs font-bold" title="Admin Control">
+                <button onclick="openAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-blue-400 flex items-center justify-center text-xs font-bold">
                     <i class="fa-solid fa-user-shield"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Store Header -->
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
                 <div class="relative">
                     <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
@@ -75,9 +78,22 @@
                     <p class="text-[11px] text-slate-400 font-medium">AI Pro Tools & Digital Services</p>
                 </div>
             </div>
-            <a id="supportBtn" href="#" target="_blank" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
+            <a id="supportBtn" href="#" target="_blank" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-white text-xs font-bold shadow-sm flex items-center gap-1.5">
                 <i class="fa-paper-plane text-blue-400"></i> ជំនួយ
             </a>
+        </div>
+
+        <!-- Search & Category Filter Bar -->
+        <div class="space-y-3 mb-6">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="filterProducts()" placeholder="ស្វែងរកសេវាកម្ម AI, CapCut..." class="w-full bg-white/10 border border-white/10 rounded-2xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 backdrop-blur-md">
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+                <button onclick="setCategory('all')" id="cat-all" class="cat-btn bg-blue-600 text-white px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap shadow-sm">ទាំងអស់</button>
+                <button onclick="setCategory('ai')" id="cat-ai" class="cat-btn bg-white/10 text-slate-300 hover:bg-white/20 px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap">AI Tools</button>
+                <button onclick="setCategory('video')" id="cat-video" class="cat-btn bg-white/10 text-slate-300 hover:bg-white/20 px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap">Video Editing</button>
+            </div>
         </div>
 
         <!-- Section Title -->
@@ -88,314 +104,352 @@
             <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full font-bold border border-blue-500/30">Instant Delivery</span>
         </div>
 
-        <!-- Products List -->
-        <div class="space-y-4 mb-8">
-            <!-- Product 1 -->
-            <div class="glass-card rounded-3xl p-5 border border-white/60 shadow-xl transition-all duration-300 hover:scale-[1.01]">
-                <div class="flex justify-between items-start mb-3">
+        <!-- Skeleton Loading & Products Container -->
+        <div id="productSkeleton" class="space-y-4 mb-8 hidden">
+            <div class="glass-card rounded-3xl p-5 border border-white/10 animate-pulse space-y-3">
+                <div class="h-4 bg-white/20 rounded w-1/3"></div>
+                <div class="h-6 bg-white/20 rounded w-2/3"></div>
+                <div class="h-10 bg-white/20 rounded-2xl w-full"></div>
+            </div>
+        </div>
+
+        <div id="productList" class="space-y-4 mb-8">
+            <!-- ChatGPT Plus -->
+            <div class="product-item glass-card rounded-3xl p-5 border border-white/60 dark:border-white/10 shadow-xl transition-all duration-300 hover:scale-[1.01]" data-category="ai" data-title="chatgpt plus gpt-4o">
+                <div class="flex justify-between items-start mb-2">
                     <div>
-                        <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">Most Popular</span>
-                        <h3 class="text-lg font-black text-slate-900 mt-1.5">ChatGPT Plus (GPT-4o)</h3>
-                        <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-brain text-emerald-500 mr-1"></i>DALL-E, Web Browsing & Canvas</p>
+                        <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase">Most Popular</span>
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1.5">ChatGPT Plus (GPT-4o)</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><i class="fa-solid fa-brain text-emerald-500 mr-1"></i>DALL-E, Web Browsing & Canvas</p>
                     </div>
                     <div class="text-right">
-                        <span class="text-2xl font-black text-blue-600">$4.50</span>
+                        <span class="text-2xl font-black text-blue-600 dark:text-blue-400">$4.50</span>
                         <p class="text-[10px] text-slate-400 font-bold">/ 1 ខែ</p>
                     </div>
                 </div>
-                <button onclick="openCheckout('ChatGPT Plus - 1 ខែ', 4.50)" class="w-full bg-slate-900 hover:bg-blue-600 active:scale-[0.98] text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
+                <button onclick="openProductDetail('ChatGPT Plus (GPT-4o)', '4.50', '1 ឧបករណ៍ (Shared Mail)', 'ធានារយៈពេល 29 ថ្ងៃពេញ (១ដូរ១)', 'ទទួលអាខោន Mail/Password ភ្លាមៗ ឬ Login តាម Cookie')" class="text-[11px] text-blue-500 hover:underline font-bold mb-3 inline-block">
+                    <i class="fa-solid fa-circle-info mr-1"></i>មើលលក្ខខណ្ឌ & របៀបប្រើ
+                </button>
+                <button onclick="openCheckout('ChatGPT Plus - 1 ខែ', 4.50)" class="w-full bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
                     <span>ទិញកញ្ចប់នេះ</span>
                     <i class="fa-solid fa-cart-shopping text-[10px]"></i>
                 </button>
             </div>
 
-            <!-- Product 2 -->
-            <div class="glass-card rounded-3xl p-5 border border-white/60 shadow-xl transition-all duration-300 hover:scale-[1.01]">
-                <div class="flex justify-between items-start mb-3">
+            <!-- Claude 3.5 -->
+            <div class="product-item glass-card rounded-3xl p-5 border border-white/60 dark:border-white/10 shadow-xl transition-all duration-300 hover:scale-[1.01]" data-category="ai" data-title="claude 3.5 pro coding">
+                <div class="flex justify-between items-start mb-2">
                     <div>
-                        <span class="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-700 text-[10px] font-black uppercase tracking-wider">Top Coding AI</span>
-                        <h3 class="text-lg font-black text-slate-900 mt-1.5">Claude 3.5 Pro</h3>
-                        <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-code text-purple-500 mr-1"></i>ជំនាញសរសេរកូដ & Artifacts</p>
+                        <span class="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-700 text-[10px] font-black uppercase">Top Coding AI</span>
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1.5">Claude 3.5 Pro</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><i class="fa-solid fa-code text-purple-500 mr-1"></i>ជំនាញសរសេរកូដ & Artifacts</p>
                     </div>
                     <div class="text-right">
-                        <span class="text-2xl font-black text-blue-600">$5.00</span>
+                        <span class="text-2xl font-black text-blue-600 dark:text-blue-400">$5.00</span>
                         <p class="text-[10px] text-slate-400 font-bold">/ 1 ខែ</p>
                     </div>
                 </div>
-                <button onclick="openCheckout('Claude 3.5 Pro - 1 ខែ', 5.00)" class="w-full bg-slate-900 hover:bg-blue-600 active:scale-[0.98] text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
+                <button onclick="openProductDetail('Claude 3.5 Pro', '5.00', '1 PC / Web Browser', 'ធានាពេញ 30 ថ្ងៃ', 'Login តាមរយៈកូដ OTP អ៊ីមែល')" class="text-[11px] text-blue-500 hover:underline font-bold mb-3 inline-block">
+                    <i class="fa-solid fa-circle-info mr-1"></i>មើលលក្ខខណ្ឌ & របៀបប្រើ
+                </button>
+                <button onclick="openCheckout('Claude 3.5 Pro - 1 ខែ', 5.00)" class="w-full bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
                     <span>ទិញកញ្ចប់នេះ</span>
                     <i class="fa-solid fa-cart-shopping text-[10px]"></i>
                 </button>
             </div>
 
-            <!-- Product 3 -->
-            <div class="glass-card rounded-3xl p-5 border border-white/60 shadow-xl transition-all duration-300 hover:scale-[1.01]">
-                <div class="flex justify-between items-start mb-3">
+            <!-- CapCut 1 Month -->
+            <div class="product-item glass-card rounded-3xl p-5 border border-white/60 dark:border-white/10 shadow-xl transition-all duration-300 hover:scale-[1.01]" data-category="video" data-title="capcut pro 1 ខែ month">
+                <div class="flex justify-between items-start mb-2">
                     <div>
-                        <span class="px-2.5 py-0.5 rounded-lg bg-pink-100 text-pink-700 text-[10px] font-black uppercase tracking-wider">AI Image Generator</span>
-                        <h3 class="text-lg font-black text-slate-900 mt-1.5">Midjourney Standard</h3>
-                        <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-palette text-pink-500 mr-1"></i>បង្កើតរូបភាព AI 4K Ultra HD</p>
+                        <span class="px-2.5 py-0.5 rounded-lg bg-sky-100 text-sky-700 text-[10px] font-black uppercase">Video Editing</span>
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1.5">CapCut Pro - 1 ខែ</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><i class="fa-solid fa-video text-sky-500 mr-1"></i>ប្រើបាន 30 ថ្ងៃ (PC & Phone)</p>
                     </div>
                     <div class="text-right">
-                        <span class="text-2xl font-black text-blue-600">$6.50</span>
+                        <span class="text-2xl font-black text-blue-600 dark:text-blue-400">$3.00</span>
                         <p class="text-[10px] text-slate-400 font-bold">/ 1 ខែ</p>
                     </div>
                 </div>
-                <button onclick="openCheckout('Midjourney Standard - 1 ខែ', 6.50)" class="w-full bg-slate-900 hover:bg-blue-600 active:scale-[0.98] text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
+                <button onclick="openProductDetail('CapCut Pro - 1 ខែ', '3.00', '1 PC + 1 Phone', 'ធានា 30 ថ្ងៃ', 'អាខោន Upgrade រួចជាស្រេច')" class="text-[11px] text-blue-500 hover:underline font-bold mb-3 inline-block">
+                    <i class="fa-solid fa-circle-info mr-1"></i>មើលលក្ខខណ្ឌ & របៀបប្រើ
+                </button>
+                <button onclick="openCheckout('CapCut Pro - 1 ខែ', 3.00)" class="w-full bg-slate-900 dark:bg-blue-600 hover:bg-blue-600 text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
                     <span>ទិញកញ្ចប់នេះ</span>
                     <i class="fa-solid fa-cart-shopping text-[10px]"></i>
                 </button>
             </div>
 
-            <!-- Product 4 -->
-            <div class="glass-card rounded-3xl p-5 border-2 border-blue-500 shadow-2xl transition-all duration-300 hover:scale-[1.01] relative overflow-hidden">
-                <div class="absolute top-0 right-0 bg-gradient-to-l from-blue-600 to-violet-600 text-white text-[9px] font-black px-3.5 py-1 rounded-bl-2xl uppercase tracking-widest shadow-md">
-                    🔥 BEST VALUE
-                </div>
-                <div class="flex justify-between items-start mb-4 mt-1">
+            <!-- CapCut 1 Year -->
+            <div class="product-item glass-card rounded-3xl p-5 border-2 border-blue-500 shadow-2xl transition-all duration-300 hover:scale-[1.01] relative overflow-hidden" data-category="video" data-title="capcut pro 1 ឆ្នាំ year">
+                <div class="absolute top-0 right-0 bg-gradient-to-l from-blue-600 to-violet-600 text-white text-[9px] font-black px-3.5 py-1 rounded-bl-2xl uppercase">🔥 BEST VALUE</div>
+                <div class="flex justify-between items-start mb-2 mt-1">
                     <div>
-                        <span class="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider">Video Editing</span>
-                        <h3 class="text-lg font-black text-slate-900 mt-2">CapCut Pro - 1 ឆ្នាំ</h3>
-                        <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-infinity text-blue-500 mr-1"></i>ប្រើបាន 365 ថ្ងៃ (PC & Phone)</p>
+                        <span class="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase">Video Editing</span>
+                        <h3 class="text-lg font-black text-slate-900 dark:text-white mt-2">CapCut Pro - 1 ឆ្នាំ</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><i class="fa-solid fa-infinity text-blue-500 mr-1"></i>ប្រើបាន 365 ថ្ងៃ (PC & Phone)</p>
                     </div>
                     <div class="text-right">
-                        <span class="text-2xl font-black text-blue-600">$15.00</span>
+                        <span class="text-2xl font-black text-blue-600 dark:text-blue-400">$15.00</span>
                         <p class="text-[10px] text-slate-400 line-through font-bold">$30.00</p>
                     </div>
                 </div>
-                <button onclick="openCheckout('CapCut Pro - 1 ឆ្នាំ', 15.00)" class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:opacity-95 active:scale-[0.98] text-white py-3.5 rounded-2xl font-bold text-xs transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 glow-effect">
+                <button onclick="openProductDetail('CapCut Pro - 1 ឆ្នាំ', '15.00', '2 Devices', 'ធានាពេញ ១ ឆ្នាំ (365 ថ្ងៃ)', 'ផ្ញើ Mail / Pass ចូលប្រើប្រាស់បានភ្លាម')" class="text-[11px] text-blue-500 hover:underline font-bold mb-3 inline-block">
+                    <i class="fa-solid fa-circle-info mr-1"></i>មើលលក្ខខណ្ឌ & របៀបប្រើ
+                </button>
+                <button onclick="openCheckout('CapCut Pro - 1 ឆ្នាំ', 15.00)" class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white py-3.5 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 glow-effect">
                     <span>ទិញកញ្ចប់សន្សំសំចៃ (Save 50%)</span>
                     <i class="fa-solid fa-bolt text-[10px]"></i>
                 </button>
             </div>
         </div>
-
     </div>
 
-    <!-- 👤 AUTH MODAL (REGISTER / LOGIN) -->
-    <div id="authModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 relative">
-            <button onclick="closeAuthModal()" class="absolute top-4 right-4 w-7 h-7 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200">
-                <i class="fa-solid fa-xmark text-xs"></i>
-            </button>
+    <!-- Product Detail Modal -->
+    <div id="productDetailModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-5 shadow-2xl relative space-y-4 text-slate-800 dark:text-slate-100">
+            <button onclick="closeProductDetail()" class="absolute top-4 right-4 w-7 h-7 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
+            <h3 id="detailTitle" class="font-black text-base border-b pb-2">ព័ត៌មានលម្អិត</h3>
+            <div class="space-y-3 text-xs">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-laptop text-blue-500 text-base w-5"></i>
+                    <div>
+                        <p class="text-slate-400 font-bold text-[10px]">ចំនួនឧបករណ៍ (Devices Limit)</p>
+                        <p id="detailDevice" class="font-bold">1 Device</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-shield-halved text-emerald-500 text-base w-5"></i>
+                    <div>
+                        <p class="text-slate-400 font-bold text-[10px]">លក្ខខណ្ឌធានា (Warranty)</p>
+                        <p id="detailWarranty" class="font-bold">30 ថ្ងៃពេញ</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-key text-amber-500 text-base w-5"></i>
+                    <div>
+                        <p class="text-slate-400 font-bold text-[10px]">របៀប Login / ប្រើប្រាស់</p>
+                        <p id="detailLogin" class="font-bold">Email & Password</p>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeProductDetail()" class="w-full bg-slate-100 dark:bg-slate-800 font-bold py-2.5 rounded-xl text-xs">យល់ព្រម</button>
+        </div>
+    </div>
 
-            <!-- Login Form -->
+    <!-- Auth Modal -->
+    <div id="authModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative text-slate-800 dark:text-slate-100">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 w-7 h-7 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl flex items-center justify-center"><i class="fa-solid fa-xmark text-xs"></i></button>
             <div id="loginFormSection" class="space-y-4">
                 <div class="text-center">
-                    <h3 class="font-black text-slate-900 text-lg">ចូលប្រើប្រព័ន្ធ</h3>
-                    <p class="text-xs text-slate-500">បញ្ចូលគណនីរបស់អ្នកដើម្បីបន្តការទិញ</p>
+                    <h3 class="font-black text-lg">ចូលប្រើប្រព័ន្ធ</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">បញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់ដើម្បី Login</p>
                 </div>
+                <button onclick="handleGoogleAuth()" class="w-full border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-google text-red-500 text-sm"></i>
+                    <span>បន្តជាមួយ Google</span>
+                </button>
                 <form onsubmit="handleUserLogin(event)" class="space-y-3">
-                    <input type="tel" id="loginPhone" placeholder="លេខទូរស័ព្ទ (ឧទាហរណ៍ 012345678)" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <input type="password" id="loginPassword" placeholder="ពាក្យសម្ងាត់" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-md">Login ចូលប្រព័ន្ធ</button>
+                    <input type="email" id="loginEmail" placeholder="អ៊ីមែល (Email)" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="password" id="loginPassword" placeholder="ពាក្យសម្ងាត់" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-xs shadow-md">Login ចូលប្រព័ន្ធ</button>
                 </form>
-                <div class="text-center pt-2 border-t">
+                <div class="text-center pt-2 border-t dark:border-slate-800">
                     <p class="text-xs text-slate-500">មិនទាន់មានគណនី? <button onclick="toggleAuthMode('register')" class="text-blue-600 font-bold hover:underline">ចុះឈ្មោះនៅទីនេះ</button></p>
                 </div>
             </div>
-
-            <!-- Register Form -->
             <div id="registerFormSection" class="space-y-4 hidden">
                 <div class="text-center">
-                    <h3 class="font-black text-slate-900 text-lg">បង្កើតគណនីថ្មី</h3>
+                    <h3 class="font-black text-lg">បង្កើតគណនីថ្មី</h3>
                     <p class="text-xs text-slate-500">សូមបំពេញព័ត៌មានខាងក្រោមដើម្បីចុះឈ្មោះ</p>
                 </div>
+                <button onclick="handleGoogleAuth()" class="w-full border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-google text-red-500 text-sm"></i>
+                    <span>ចុះឈ្មោះជាមួយ Google</span>
+                </button>
                 <form onsubmit="handleUserRegister(event)" class="space-y-3">
-                    <input type="text" id="regName" placeholder="ឈ្មោះពេញរបស់អ្នក" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <input type="tel" id="regPhone" placeholder="លេខទូរស័ព្ទ" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <input type="password" id="regPassword" placeholder="បង្កើតពាក្យសម្ងាត់" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-md">បង្កើតគណនី</button>
+                    <input type="text" id="regName" placeholder="ឈ្មោះពេញរបស់អ្នក" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="email" id="regEmail" placeholder="អ៊ីមែល (Email)" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="password" id="regPassword" placeholder="បង្កើតពាក្យសម្ងាត់ (យ៉ាងតិច ៦ខ្ទង់)" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs shadow-md">បង្កើតគណនី</button>
                 </form>
-                <div class="text-center pt-2 border-t">
+                <div class="text-center pt-2 border-t dark:border-slate-800">
                     <p class="text-xs text-slate-500">មានគណនីរួចហើយ? <button onclick="toggleAuthMode('login')" class="text-blue-600 font-bold hover:underline">Login នៅទីនេះ</button></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- KHQR Checkout Sheet Modal -->
+    <!-- Profile Modal -->
+    <div id="profileModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto space-y-4 text-slate-800 dark:text-slate-100">
+            <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3">
+                <h3 class="font-extrabold text-sm flex items-center gap-2"><i class="fa-solid fa-user-gear text-blue-600"></i> ព័ត៌មានគណនី</h3>
+                <button onclick="closeProfileModal()" class="w-7 h-7 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><i class="fa-solid fa-xmark text-xs"></i></button>
+            </div>
+            <!-- Wallet Display Area -->
+            <div class="p-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl flex justify-between items-center shadow-md">
+                <div>
+                    <p class="text-[10px] font-bold text-blue-100 uppercase">កាបូបលុយ (Wallet Balance)</p>
+                    <p class="text-xl font-black">$<span id="userWalletBalance">0.00</span></p>
+                </div>
+                <i class="fa-solid fa-wallet text-2xl text-blue-200"></i>
+            </div>
+
+            <form onsubmit="handleUpdateProfile(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold mb-1">ឈ្មោះបង្ហាញ</label>
+                    <input type="text" id="profileNameInput" required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold mb-1">អ៊ីមែល</label>
+                    <input type="email" id="profileEmailInput" disabled class="w-full bg-slate-100 dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-400 cursor-not-allowed">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs">រក្សាទុកការកែប្រែ</button>
+            </form>
+            <div class="border-t dark:border-slate-800 pt-3">
+                <h4 class="font-bold text-xs mb-2"><i class="fa-solid fa-clock text-amber-500"></i> កញ្ចប់ AI Pro ដែលកំពុងប្រើប្រាស់</h4>
+                <div id="userSubscriptionList" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHQR & Checkout Sheet -->
     <div id="checkoutSheet" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden opacity-0 transition-opacity duration-300 flex items-end sm:items-center justify-center">
-        <div class="bg-white w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl transform translate-y-full transition-transform duration-300 max-h-[92vh] overflow-y-auto" id="sheetContent">
-            
-            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-                <button onclick="closeCheckout()" class="w-8 h-8 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-colors">
-                    <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
-                <h3 class="font-bold text-slate-800 text-base">ទូទាត់ប្រាក់តាម KHQR</h3>
-                <div class="flex items-center gap-1.5 bg-sky-50 text-sky-600 px-2.5 py-1 rounded-full border border-sky-100">
-                    <div class="w-3.5 h-3.5 rounded-full border-2 border-sky-500 border-t-transparent animate-spin"></div>
-                    <span id="timerText" class="text-xs font-bold tracking-wider">03:00</span>
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl transform translate-y-full transition-transform duration-300 max-h-[92vh] overflow-y-auto text-slate-800 dark:text-slate-100" id="sheetContent">
+            <div class="flex justify-between items-center pb-3 border-b dark:border-slate-800">
+                <button onclick="closeCheckout()" class="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl"><i class="fa-solid fa-xmark text-sm"></i></button>
+                <h3 class="font-bold text-base">ជ្រើសរើសការទូទាត់</h3>
+                <div class="flex items-center gap-1.5 bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 px-2.5 py-1 rounded-full border border-sky-100 dark:border-sky-800">
+                    <span id="timerText" class="text-xs font-bold">03:00</span>
                 </div>
             </div>
 
-            <!-- KHQR Card Container -->
-            <div class="my-4 flex flex-col items-center">
-                <div class="w-64 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative">
-                    <div class="bg-[#E11D2A] px-4 py-2 text-center relative">
-                        <span class="text-white font-black text-sm tracking-wider">KHQR</span>
-                    </div>
+            <!-- Payment Method Selector -->
+            <div class="my-3">
+                <label class="block text-xs font-bold mb-2">វិធីសាស្ត្រទូទាត់</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 border dark:border-slate-700 p-2.5 rounded-2xl cursor-pointer bg-blue-50/50 dark:bg-blue-950/30 border-blue-500">
+                        <input type="radio" name="payMethod" value="khqr" checked onchange="togglePayMethodUI('khqr')" class="accent-blue-600">
+                        <div>
+                            <p class="text-xs font-black">KHQR Code</p>
+                            <p class="text-[9px] text-slate-400">ស្កែនតាម ABA / App</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2 border dark:border-slate-700 p-2.5 rounded-2xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <input type="radio" name="payMethod" value="wallet" onchange="togglePayMethodUI('wallet')" class="accent-blue-600">
+                        <div>
+                            <p class="text-xs font-black">Wallet Balance</p>
+                            <p class="text-[9px] text-emerald-500 font-bold">$<span id="checkoutWalletBalance">0.00</span></p>
+                        </div>
+                    </label>
+                </div>
+            </div>
 
+            <div id="khqrContainer" class="my-4 flex flex-col items-center">
+                <div class="w-64 bg-white rounded-2xl shadow-xl border overflow-hidden text-slate-800">
+                    <div class="bg-[#E11D2A] px-4 py-2 text-center"><span class="text-white font-black text-sm">KHQR</span></div>
                     <div class="pt-3 pb-1 px-4 text-center">
-                        <p class="text-[11px] font-bold text-slate-600 tracking-wide uppercase" id="khqrAccName">HOEUN LEANGHAK</p>
+                        <p class="text-[11px] font-bold text-slate-600 uppercase" id="khqrAccName">HOEUN LEANGHAK</p>
                         <div class="flex items-baseline justify-center gap-1 mt-0.5">
                             <span class="text-2xl font-black text-slate-900" id="selectedPlanPrice">0.00</span>
                             <span class="text-xs font-bold text-slate-500">USD</span>
                         </div>
                     </div>
-
-                    <div class="relative my-1">
-                        <div class="border-b-2 border-dashed border-slate-200 w-full"></div>
-                        <div class="absolute -left-2 -top-1.5 w-3 h-3 bg-slate-100 rounded-full"></div>
-                        <div class="absolute -right-2 -top-1.5 w-3 h-3 bg-slate-100 rounded-full"></div>
-                    </div>
-
                     <div class="p-3 text-center">
-                        <div class="bg-white p-2 rounded-xl border border-slate-100 inline-block shadow-inner relative">
-                            <img id="qrCodeImg" src="" alt="Dynamic KHQR Code" class="w-44 h-44 object-contain mx-auto">
-                        </div>
+                        <img id="qrCodeImg" src="" alt="KHQR Code" class="w-44 h-44 object-contain mx-auto">
                     </div>
                 </div>
-
-                <!-- Deep Link Button to Mobile Banking -->
-                <a id="abaDeepLink" href="#" class="mt-3 w-64 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-mobile-screen-button text-sm"></i>
-                    <span>បើកកម្មវិធី ABA Mobile</span>
+                <a id="abaDeepLink" href="#" class="mt-3 w-64 bg-red-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-mobile-screen-button text-sm"></i> បើក ABA Mobile
                 </a>
             </div>
 
-            <!-- Checkout Form -->
             <form onsubmit="handleOrderSubmit(event)" class="space-y-3">
-                <div>
-                    <div class="flex gap-2">
-                        <input type="text" id="couponInput" placeholder="កូដបញ្ចុះតម្លៃ (Coupon)" class="uppercase w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="applyDiscount()" class="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all">បញ្ជាក់</button>
-                    </div>
-                    <p id="discountMsg" class="text-[11px] mt-1 hidden"></p>
+                <div class="flex gap-2">
+                    <input type="text" id="couponInput" placeholder="កូដបញ្ចុះតម្លៃ" class="uppercase w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs">
+                    <button type="button" onclick="applyDiscount()" class="bg-slate-900 dark:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold">បញ្ជាក់</button>
                 </div>
-
+                <p id="discountMsg" class="text-[11px] hidden"></p>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">
-                        លេខទូរស័ព្ទ / គណនីទំនាក់ទំនង <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" id="contactInfo" required placeholder="ឧទាហរណ៍៖ 012345678" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <label class="block text-xs font-bold mb-1">លេខទូរស័ព្ទ / Telegram ទំនាក់ទំនង *</label>
+                    <input type="text" id="contactInfo" required placeholder="012345678" class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs">
                 </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">
-                        លេខកូដប្រតិបត្តិការ (Transaction ID) <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" id="transId" required placeholder="ឧទាហរណ៍៖ 123 456 789" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                <div id="transIdSection">
+                    <label class="block text-xs font-bold mb-1">លេខកូដប្រតិបត្តិការ (Transaction ID) *</label>
+                    <input type="text" id="transId" required placeholder="123 456 789" class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs">
                 </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">រូបភាពវិក្កយបត្រ (Upload Slip)</label>
-                    <div class="relative border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl p-2.5 text-center hover:bg-slate-100/80 transition-all cursor-pointer">
-                        <input type="file" id="slipFile" accept="image/*" onchange="previewSlip(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                        <div id="uploadPlaceholder" class="space-y-0.5">
-                            <i class="fa-solid fa-cloud-arrow-up text-blue-500 text-base"></i>
-                            <p class="text-xs font-bold text-slate-600">ចុចទីនេះដើម្បី Upload រូបភាព Slip</p>
-                        </div>
-                        <div id="uploadPreview" class="hidden flex items-center justify-between bg-white p-1.5 rounded-xl border">
-                            <div class="flex items-center gap-2 overflow-hidden">
-                                <i class="fa-solid fa-file-image text-emerald-500 text-sm"></i>
-                                <span id="fileName" class="text-xs font-bold text-slate-700 truncate max-w-[180px]">slip.png</span>
-                            </div>
-                            <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">រួចរាល់</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" id="btnSubmit" class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:opacity-95 active:scale-[0.98] text-white py-3.5 rounded-2xl font-bold text-xs shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center gap-2 mt-2">
-                    <span>បញ្ជូនការបញ្ជាទិញ</span>
-                    <i class="fa-solid fa-paper-plane text-xs"></i>
-                </button>
+                <button type="submit" id="btnSubmit" class="w-full bg-blue-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-lg">បញ្ជូនការបញ្ជាទិញ</button>
             </form>
         </div>
     </div>
 
-    <!-- Customer Order History Modal -->
+    <!-- History & Auto Delivery View Modal -->
     <div id="historyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl border border-slate-100 max-h-[85vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b pb-3 mb-3">
-                <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-receipt text-blue-600"></i> ប្រវត្តិការបញ្ជាទិញរបស់អ្នក
-                </h3>
-                <button onclick="closeHistoryModal()" class="w-7 h-7 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-200">
-                    <i class="fa-solid fa-xmark text-xs"></i>
-                </button>
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto text-slate-800 dark:text-slate-100">
+            <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3 mb-3">
+                <h3 class="font-extrabold text-sm">ប្រវត្តិការបញ្ជាទិញ & Stock អាខោន</h3>
+                <button onclick="closeHistoryModal()" class="w-7 h-7 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><i class="fa-solid fa-xmark text-xs"></i></button>
             </div>
             <div id="customerOrderList" class="space-y-2.5"></div>
         </div>
     </div>
 
-    <!-- 🔒 HIDDEN ADMIN PANEL -->
+    <!-- Admin Modal -->
     <div id="adminModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            
-            <!-- Login Form -->
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto text-slate-800 dark:text-slate-100">
             <div id="adminLoginSection" class="space-y-4">
-                <div class="text-center">
-                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                        <i class="fa-solid fa-user-shield text-xl"></i>
-                    </div>
-                    <h3 class="font-extrabold text-slate-900 text-lg">Admin Control Panel</h3>
-                    <p class="text-xs text-slate-500">បញ្ចូល Password គ្រប់គ្រង Order និងអតិថិជន</p>
-                </div>
+                <h3 class="font-extrabold text-lg text-center">Admin Control Panel</h3>
                 <form onsubmit="handleAdminLogin(event)" class="space-y-3">
-                    <input type="password" id="adminPasswordInput" placeholder="បញ្ចូល Password..." required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="password" id="adminPasswordInput" placeholder="Password..." required class="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs">
                     <div class="flex gap-2">
-                        <button type="button" onclick="closeAdminModal()" class="w-1/2 bg-slate-100 text-slate-600 py-2.5 rounded-xl font-bold text-xs">ចាកចេញ</button>
-                        <button type="submit" class="w-1/2 bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-blue-700">ចូលប្រព័ន្ធ</button>
+                        <button type="button" onclick="closeAdminModal()" class="w-1/2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 py-2.5 rounded-xl font-bold text-xs">ចាកចេញ</button>
+                        <button type="submit" class="w-1/2 bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs">ចូលប្រព័ន្ធ</button>
                     </div>
                 </form>
             </div>
-
-            <!-- Dashboard Details -->
             <div id="adminDashboard" class="hidden space-y-4">
-                <div class="flex justify-between items-center border-b pb-3">
-                    <div>
-                        <h3 class="font-extrabold text-slate-900 text-base">📦 ការគ្រប់គ្រងហាង (Admin)</h3>
-                        <p class="text-[11px] text-slate-400">គ្រប់គ្រង Order និងបញ្ជីអតិថិជន</p>
-                    </div>
-                    <button onclick="closeAdminModal()" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-lg font-bold hover:bg-slate-200">បិទ</button>
+                <div class="flex justify-between items-center border-b dark:border-slate-800 pb-3">
+                    <h3 class="font-extrabold text-base">គ្រប់គ្រងហាង</h3>
+                    <button onclick="closeAdminModal()" class="text-xs bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-lg">បិទ</button>
+                </div>
+                <div class="flex gap-2 border-b dark:border-slate-800 pb-2 overflow-x-auto text-xs">
+                    <button id="tabOrdersBtn" onclick="switchAdminTab('orders')" class="px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold">Orders</button>
+                    <button id="tabUsersBtn" onclick="switchAdminTab('users')" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">Users & TopUp</button>
+                    <button id="tabStockBtn" onclick="switchAdminTab('stock')" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">Stock Auto</button>
                 </div>
 
-                <!-- Admin Tabs -->
-                <div class="flex gap-2 border-b pb-2">
-                    <button id="tabOrdersBtn" onclick="switchAdminTab('orders')" class="flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold">Orders ទាំងអស់</button>
-                    <button id="tabUsersBtn" onclick="switchAdminTab('users')" class="flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold">បញ្ជីអតិថិជន</button>
-                </div>
-
-                <!-- View 1: Orders Management -->
                 <div id="adminOrdersSection" class="space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-500">បញ្ជី Order ថ្មីៗ</span>
-                        <button onclick="clearAllOrders()" class="text-[10px] text-rose-600 hover:underline font-bold"><i class="fa-solid fa-trash mr-1"></i>លុប Order ទាំងអស់</button>
-                    </div>
-                    <div id="adminOrderList" class="space-y-3 max-h-[50vh] overflow-y-auto pr-1"></div>
+                    <div id="adminOrderList" class="space-y-3 max-h-[50vh] overflow-y-auto"></div>
                 </div>
 
-                <!-- View 2: Users List -->
                 <div id="adminUsersSection" class="space-y-3 hidden">
-                    <span class="text-xs font-bold text-slate-500">អតិថិជនដែលបានបង្កើត Account</span>
-                    <div id="adminUserList" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1"></div>
+                    <div id="adminUserList" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
                 </div>
 
+                <!-- Auto Delivery Stock System Manager -->
+                <div id="adminStockSection" class="space-y-3 hidden text-xs">
+                    <form onsubmit="handleAddStock(event)" class="p-3 border dark:border-slate-800 rounded-xl space-y-2 bg-slate-50 dark:bg-slate-800/50">
+                        <p class="font-bold">បញ្ចូល Stock អាខោនថ្មី</p>
+                        <input type="text" id="stockPlanName" placeholder="ឈ្មោះកញ្ចប់ (ឧ. ChatGPT Plus - 1 ខែ)" required class="w-full bg-white dark:bg-slate-800 border p-2 rounded-lg">
+                        <textarea id="stockData" placeholder="ព័ត៌មានអាខោន (Email, Password, Cookie ឬ License)" required class="w-full bg-white dark:bg-slate-800 border p-2 rounded-lg h-16"></textarea>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-lg">រក្សាទុកចូល Stock</button>
+                    </form>
+                    <div id="adminStockList" class="space-y-2 max-h-[30vh] overflow-y-auto"></div>
+                </div>
             </div>
-
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden transition-all duration-300">
-        <div class="bg-slate-900/90 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-2.5 text-xs font-bold">
-            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+    <!-- Toast -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden transition-all">
+        <div class="bg-slate-900/90 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border border-slate-700">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
             <span id="toastMsg">សារជូនដំណឹង</span>
         </div>
     </div>
 
-    <!-- JavaScript Source -->
-    <script src="script.js"></script>
+    <script src="script.js" type="module"></script>
 </body>
 </html>
