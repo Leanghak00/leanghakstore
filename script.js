@@ -15,141 +15,16 @@ const CONFIG = {
     CITY: "Phnom Penh"
 };
 
+const ADMIN_PASSWORD = "123"; // 🔑 Password Admin
+
 let rawPrice = 0;
 let finalPrice = 0;
 let currentPlanName = "";
 let timerInterval = null;
-let currentKHQRData = "";
-let selectedAuthType = "phone"; // Default: Phone
+let currentKHQRString = "";
+let currentUser = null; // Store Logged In User State
 
-// Navigation Tab Switching
-function switchTab(tab) {
-    document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-
-    document.getElementById(`view-${tab}`).classList.remove('hidden');
-    document.getElementById(`tab-${tab}`).classList.add('active');
-
-    if (tab === 'history') {
-        renderOrderHistory();
-    }
-}
-
-// Copy to Clipboard
-function copyToClipboard(text, msg = "ចម្លងរួចរាល់!") {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast(msg, true);
-    });
-}
-
-// Check Auth & Handle Purchase
-function checkAuthAndOpenCheckout(plan, price) {
-    const user = JSON.parse(localStorage.getItem('store_user') || 'null');
-    
-    currentPlanName = plan;
-    rawPrice = price;
-
-    if (!user) {
-        // បើមិនទាន់មាន Account ឱ្យលោតផ្ទាំងចុះឈ្មោះ/បង្កើត Account
-        openAuthModal();
-    } else {
-        // បើមានរួចហើយ បើក Checkout តែម្តង
-        openCheckout(plan, price);
-    }
-}
-
-// Authentication Modal Logic
-function openAuthModal() {
-    const modal = document.getElementById('authModal');
-    const content = document.getElementById('authContent');
-    const user = JSON.parse(localStorage.getItem('store_user') || 'null');
-
-    if (user) {
-        document.getElementById('authName').value = user.name || '';
-        if (user.type === 'email') {
-            setAuthType('email');
-            document.getElementById('authContactEmail').value = user.contact || '';
-        } else {
-            setAuthType('phone');
-            document.getElementById('authContactPhone').value = user.contact || '';
-        }
-    }
-
-    modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.classList.remove('opacity-0');
-        content.classList.remove('scale-95');
-    }, 10);
-}
-
-function closeAuthModal() {
-    const modal = document.getElementById('authModal');
-    const content = document.getElementById('authContent');
-
-    content.classList.add('scale-95');
-    modal.classList.add('opacity-0');
-    setTimeout(() => { modal.classList.add('hidden'); }, 300);
-}
-
-function setAuthType(type) {
-    selectedAuthType = type;
-    const btnPhone = document.getElementById('btnTypePhone');
-    const btnEmail = document.getElementById('btnTypeEmail');
-    const inputPhone = document.getElementById('authContactPhone');
-    const inputEmail = document.getElementById('authContactEmail');
-
-    if (type === 'phone') {
-        btnPhone.className = "py-2 text-xs font-bold rounded-xl border border-blue-600 bg-blue-50 text-blue-600";
-        btnEmail.className = "py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-600";
-        inputPhone.classList.remove('hidden');
-        inputPhone.required = true;
-        inputEmail.classList.add('hidden');
-        inputEmail.required = false;
-    } else {
-        btnEmail.className = "py-2 text-xs font-bold rounded-xl border border-blue-600 bg-blue-50 text-blue-600";
-        btnPhone.className = "py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-600";
-        inputEmail.classList.remove('hidden');
-        inputEmail.required = true;
-        inputPhone.classList.add('hidden');
-        inputPhone.required = false;
-    }
-}
-
-function handleAuthSubmit(e) {
-    e.preventDefault();
-    const name = document.getElementById('authName').value.trim();
-    const contact = selectedAuthType === 'phone' 
-        ? document.getElementById('authContactPhone').value.trim()
-        : document.getElementById('authContactEmail').value.trim();
-
-    const userData = {
-        name: name,
-        contact: contact,
-        type: selectedAuthType
-    };
-
-    // Save to LocalStorage
-    localStorage.setItem('store_user', JSON.stringify(userData));
-    updateUserHeaderDisplay();
-    closeAuthModal();
-
-    showToast("🎉 ចុះឈ្មោះ/ភ្ជាប់គណនីជោគជ័យ!");
-
-    // Continue Checkout if item was selected
-    if (currentPlanName) {
-        openCheckout(currentPlanName, rawPrice);
-    }
-}
-
-function updateUserHeaderDisplay() {
-    const user = JSON.parse(localStorage.getItem('store_user') || 'null');
-    const headerInfo = document.getElementById('headerUserInfo');
-    if (user) {
-        headerInfo.innerText = `👤 ${user.name} (${user.contact})`;
-    }
-}
-
-// KHQR Generator Algorithms
+// CRC16 Calculation & TLV Format
 function calculateCRC16(data) {
     let crc = 0xFFFF;
     for (let i = 0; i < data.length; i++) {
@@ -185,52 +60,15 @@ function generateOfficialKHQR(amount) {
     const city = formatTLV("60", CONFIG.CITY);
 
     const billNumber = formatTLV("01", "INV" + Math.floor(1000 + Math.random() * 9000));
-    const additionalData = formatTLV("62", billNumber);
+    const storeLabel = formatTLV("03", "Leanghak Store");
+    const additionalData = formatTLV("62", billNumber + storeLabel);
 
     let rawKHQR = payloadFormat + poiMethod + merchantAccInfo + categoryCode + currency + amountStr + countryCode + merchantName + city + additionalData + "6304";
     const crc = calculateCRC16(rawKHQR);
-    currentKHQRData = rawKHQR + crc;
+    currentKHQRString = rawKHQR + crc;
 
-    document.getElementById('qrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentKHQRData)}`;
-    document.getElementById('abaDeepLink').href = `abamobile://qr?data=${encodeURIComponent(currentKHQRData)}`;
-}
-
-// LocalStorage Order History
-function saveOrderToLocal(order) {
-    let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
-    orders.unshift(order);
-    localStorage.setItem('user_orders', JSON.stringify(orders));
-}
-
-function renderOrderHistory() {
-    const historyList = document.getElementById('historyList');
-    let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
-
-    if (orders.length === 0) {
-        historyList.innerHTML = `
-            <div class="text-center py-8 white-card rounded-2xl border border-slate-100">
-                <i class="fa-solid fa-box-open text-slate-300 text-3xl mb-2"></i>
-                <p class="text-xs font-bold text-slate-400">មិនទាន់មានប្រវត្តិទិញនៅឡើយទេ</p>
-            </div>`;
-        return;
-    }
-
-    historyList.innerHTML = orders.map(o => `
-        <div class="white-card rounded-2xl p-3.5 border border-slate-100 space-y-2">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                <span class="font-extrabold text-xs text-slate-900">${o.plan}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-600 border border-amber-100">កំពុងពិនិត្យ (Pending)</span>
-            </div>
-            <div class="flex justify-between items-center text-[11px] text-slate-500">
-                <span>ថ្ងៃខែ៖ ${o.date}</span>
-                <span class="font-black text-blue-600">$${o.price.toFixed(2)}</span>
-            </div>
-            <div class="flex justify-between items-center text-[10px] bg-slate-50 p-2 rounded-lg font-mono text-slate-600">
-                <span>Trans ID: ${o.transId}</span>
-                <button onclick="copyToClipboard('${o.transId}', 'ចម្លង Trans ID រួចរាល់!')" class="text-blue-600 hover:underline">Copy</button>
-            </div>
-        </div>
-    `).join('');
+    document.getElementById('qrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentKHQRString)}`;
+    document.getElementById('abaDeepLink').href = `abamobilebank://qr?code=${encodeURIComponent(currentKHQRString)}`;
 }
 
 function startTimer(durationInSeconds) {
@@ -262,15 +100,116 @@ function showToast(msg, isSuccess = true) {
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
-function openCheckout(plan, price) {
-    const user = JSON.parse(localStorage.getItem('store_user') || '{}');
+// ================= 👤 USER AUTHENTICATION SYSTEM =================
+
+function checkUserLoginState() {
+    const loggedUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+    currentUser = loggedUser;
+    const profileArea = document.getElementById('userProfileArea');
+
+    if (currentUser) {
+        profileArea.innerHTML = `
+            <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
+                ${currentUser.name.charAt(0).toUpperCase()}
+            </div>
+            <div class="text-left">
+                <p class="text-xs font-extrabold text-white leading-tight">${currentUser.name}</p>
+                <button onclick="handleLogout()" class="text-[10px] text-rose-400 hover:underline font-bold">Logout</button>
+            </div>
+        `;
+    } else {
+        profileArea.innerHTML = `
+            <button onclick="openAuthModal('login')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5">
+                <i class="fa-solid fa-right-to-bracket"></i> ចូលប្រើ / បង្កើត Account
+            </button>
+        `;
+    }
+}
+
+function openAuthModal(mode = 'login') {
+    toggleAuthMode(mode);
+    document.getElementById('authModal').classList.remove('hidden');
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').classList.add('hidden');
+}
+
+function toggleAuthMode(mode) {
+    if (mode === 'register') {
+        document.getElementById('loginFormSection').classList.add('hidden');
+        document.getElementById('registerFormSection').classList.remove('hidden');
+    } else {
+        document.getElementById('registerFormSection').classList.add('hidden');
+        document.getElementById('loginFormSection').classList.remove('hidden');
+    }
+}
+
+function handleUserRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById('regName').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+    const password = document.getElementById('regPassword').value;
+
+    let users = JSON.parse(localStorage.getItem('store_users') || '[]');
     
+    if (users.find(u => u.phone === phone)) {
+        showToast("លេខទូរស័ព្ទនេះមានគណនីរួចហើយ!", false);
+        return;
+    }
+
+    const newUser = { name, phone, password, id: Date.now() };
+    users.push(newUser);
+    localStorage.setItem('store_users', JSON.stringify(users));
+    
+    // Auto Login after register
+    localStorage.setItem('current_user', JSON.stringify(newUser));
+    checkUserLoginState();
+    closeAuthModal();
+    showToast("🎉 បង្កើតគណនីបានជោគជ័យ!");
+}
+
+function handleUserLogin(e) {
+    e.preventDefault();
+    const phone = document.getElementById('loginPhone').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    let users = JSON.parse(localStorage.getItem('store_users') || '[]');
+    const user = users.find(u => u.phone === phone && u.password === password);
+
+    if (user) {
+        localStorage.setItem('current_user', JSON.stringify(user));
+        checkUserLoginState();
+        closeAuthModal();
+        showToast("👋 ស្វាគមន៍ការត្រឡប់មកវិញ!");
+    } else {
+        showToast("លេខទូរស័ព្ទ ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ!", false);
+    }
+}
+
+function handleLogout() {
+    localStorage.removeItem('current_user');
+    checkUserLoginState();
+    showToast("បាន Logout រួចរាល់");
+}
+
+// Open Checkout Sheet
+function openCheckout(plan, price) {
+    if (!currentUser) {
+        showToast("សូមបង្កើតគណនី ឬ Login មុននឹងទិញ!", false);
+        openAuthModal('login');
+        return;
+    }
+
+    currentPlanName = plan;
+    rawPrice = price;
     finalPrice = price;
+    
     document.getElementById('selectedPlanPrice').innerText = price.toFixed(2);
-    document.getElementById('checkoutUserDisplay').innerText = `${user.name || 'N/A'} - ${user.contact || 'N/A'}`;
     document.getElementById('discountMsg').classList.add('hidden');
     document.getElementById('couponInput').value = "";
-    
+    document.getElementById('contactInfo').value = `${currentUser.name} (${currentUser.phone})`;
+
     generateOfficialKHQR(finalPrice);
     startTimer(180);
 
@@ -322,10 +261,11 @@ function previewSlip(e) {
     }
 }
 
+// 🛒 Handle Order Submit
 async function handleOrderSubmit(e) {
     e.preventDefault();
 
-    const user = JSON.parse(localStorage.getItem('store_user') || '{}');
+    const contact = document.getElementById('contactInfo').value.trim();
     const transId = document.getElementById('transId').value.trim();
     const slipInput = document.getElementById('slipFile');
     const btn = document.getElementById('btnSubmit');
@@ -333,11 +273,27 @@ async function handleOrderSubmit(e) {
     btn.disabled = true;
     btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> កំពុងបញ្ជូន...`;
 
+    // 1. Save locally for Admin & Customer History
+    let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
+    orders.unshift({
+        id: "ORD-" + Date.now(),
+        userPhone: currentUser.phone,
+        userName: currentUser.name,
+        plan: currentPlanName,
+        price: finalPrice,
+        contact: contact,
+        transId: transId,
+        status: 'Pending',
+        date: new Date().toLocaleString('km-KH')
+    });
+    localStorage.setItem('user_orders', JSON.stringify(orders));
+
+    // 2. Telegram Bot Payload
     const message = `<b>🛒 ការបញ្ជាទិញថ្មីពី LEANGHAK STORE</b>\n\n` +
-                    `<b>👤 អតិថិជន:</b> ${user.name || 'N/A'}\n` +
-                    `<b>📞 ទំនាក់ទំនង (${user.type || 'N/A'}):</b> ${user.contact || 'N/A'}\n` +
-                    `<b>📦 ទំនិញ/សេវាកម្ម:</b> ${currentPlanName}\n` +
-                    `<b>💵 តម្លៃទូទាត់:</b> $${finalPrice.toFixed(2)}\n` +
+                    `<b>👤 អតិថិជន:</b> ${currentUser.name}\n` +
+                    `<b>📦 ទំនិញ:</b> ${currentPlanName}\n` +
+                    `<b>💵 តម្លៃ:</b> $${finalPrice.toFixed(2)}\n` +
+                    `<b>📞 ទំនាក់ទំនង:</b> ${contact}\n` +
                     `<b>🧾 Trans ID:</b> <code>${transId}</code>`;
 
     try {
@@ -364,13 +320,6 @@ async function handleOrderSubmit(e) {
             });
         }
 
-        saveOrderToLocal({
-            plan: currentPlanName,
-            price: finalPrice,
-            transId: transId,
-            date: new Date().toLocaleDateString('km-KH')
-        });
-
         if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         showToast("🎉 បញ្ជូនការបញ្ជាទិញជោគជ័យ!");
         closeCheckout();
@@ -384,102 +333,151 @@ async function handleOrderSubmit(e) {
     }
 }
 
-// Page Load Setup
+// 📜 Customer Order History
+function openHistoryModal() {
+    if (!currentUser) {
+        showToast("សូម Login ដើម្បីមើលប្រវត្តិបញ្ជាទិញ!", false);
+        openAuthModal('login');
+        return;
+    }
+
+    const modal = document.getElementById('historyModal');
+    const container = document.getElementById('customerOrderList');
+    let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
+
+    // Filter order only for logged in user
+    let userOrders = orders.filter(o => o.userPhone === currentUser.phone);
+
+    if (userOrders.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">គ្មានប្រវត្តិបញ្ជាទិញនៅឡើយទេ</p>`;
+    } else {
+        container.innerHTML = userOrders.map(o => `
+            <div class="p-3 bg-slate-50 border rounded-2xl space-y-1">
+                <div class="flex justify-between items-center text-xs font-bold">
+                    <span class="text-slate-800">${o.plan}</span>
+                    <span class="text-blue-600">$${o.price.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between items-center text-[10px] text-slate-500">
+                    <span>${o.date}</span>
+                    <span class="px-2 py-0.5 rounded-full font-bold ${
+                        o.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                        o.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                    }">${o.status}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeHistoryModal() {
+    document.getElementById('historyModal').classList.add('hidden');
+}
+
+// ================= 🔑 ADMIN CONTROL SYSTEM =================
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('supportBtn').href = `https://t.me/${CONFIG.ADMIN_USERNAME.replace('https://t.me/', '')}`;
     document.getElementById('khqrAccName').innerText = CONFIG.MERCHANT_NAME;
 
-    // Auto load user info if saved
-    updateUserHeaderDisplay();
-});
-// ================= Admin Credentials & Config =================
-const ADMIN_PASSWORD = "123"; // 🔑 ពាក្យសម្ងាត់សម្រាប់ចូល Admin (អាចដូរបានតាមចិត្ត)
+    checkUserLoginState();
 
-// Handle Admin Login
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('admin') === 'true') {
+        openAdminModal();
+    }
+});
+
+function openAdminModal() {
+    document.getElementById('adminModal').classList.remove('hidden');
+}
+
+function closeAdminModal() {
+    document.getElementById('adminModal').classList.add('hidden');
+}
+
 function handleAdminLogin(e) {
     e.preventDefault();
     const pass = document.getElementById('adminPasswordInput').value;
     
     if (pass === ADMIN_PASSWORD) {
-        sessionStorage.setItem('admin_logged_in', 'true');
         document.getElementById('adminLoginSection').classList.add('hidden');
         document.getElementById('adminDashboard').classList.remove('hidden');
         renderAdminOrders();
+        renderAdminUsers();
     } else {
-        alert('❌ ពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!');
+        alert('❌ ពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវទេ!');
     }
 }
 
-// Handle Admin Logout
-function handleAdminLogout() {
-    sessionStorage.removeItem('admin_logged_in');
-    window.location.reload();
+function switchAdminTab(tab) {
+    if (tab === 'orders') {
+        document.getElementById('adminOrdersSection').classList.remove('hidden');
+        document.getElementById('adminUsersSection').classList.add('hidden');
+        document.getElementById('tabOrdersBtn').className = "flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold";
+        document.getElementById('tabUsersBtn').className = "flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold";
+    } else {
+        document.getElementById('adminOrdersSection').classList.add('hidden');
+        document.getElementById('adminUsersSection').classList.remove('hidden');
+        document.getElementById('tabOrdersBtn').className = "flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold";
+        document.getElementById('tabUsersBtn').className = "flex-1 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold";
+    }
 }
 
-// Render Orders in Admin Panel
 function renderAdminOrders() {
     const container = document.getElementById('adminOrderList');
-    if (!container) return;
-
-    // ទាញយកទិន្នន័យពី LocalStorage របស់ហាង
     let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
 
     if (orders.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-10">
-                <i class="fa-solid fa-inbox text-slate-300 text-4xl mb-2"></i>
-                <p class="text-xs font-bold text-slate-400">មិនទាន់មានការបញ្ជាទិញនៅឡើយទេ</p>
-            </div>
-        `;
+        container.innerHTML = `<p class="text-xs font-bold text-slate-400 text-center py-6">មិនទាន់មាន Order ទេ</p>`;
         return;
     }
 
     container.innerHTML = orders.map((o, index) => `
-        <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50 hover:bg-white transition-all space-y-3">
-            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200 pb-2">
-                <div>
-                    <span class="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">#${orders.length - index}</span>
-                    <span class="font-extrabold text-slate-900 text-sm ml-1">${o.plan}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">$${o.price.toFixed(2)}</span>
-                    <select onchange="updateOrderStatus(${index}, this.value)" class="text-xs font-bold border rounded-lg px-2 py-1 bg-white focus:outline-none">
-                        <option value="Pending" ${o.status === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
-                        <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>✅ Completed</option>
-                        <option value="Cancelled" ${o.status === 'Cancelled' ? 'selected' : ''}>❌ Cancelled</option>
-                    </select>
-                </div>
+        <div class="border border-slate-200 rounded-2xl p-3 bg-slate-50 space-y-2">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                <span class="font-extrabold text-xs text-slate-900">${o.plan}</span>
+                <span class="text-xs font-black text-emerald-600">$${o.price.toFixed(2)}</span>
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div>
-                    <span class="text-slate-400 font-medium">អតិថិជន៖</span>
-                    <span class="font-bold text-slate-800">${o.userName || 'N/A'}</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 font-medium">ទំនាក់ទំនង (${o.userType || 'N/A'})៖</span>
-                    <span class="font-bold text-blue-600">${o.userContact || 'N/A'}</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 font-medium">កាលបរិច្ឆេទ៖</span>
-                    <span class="font-semibold text-slate-700">${o.date}</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 font-medium">Transaction ID:</span>
-                    <span class="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border">${o.transId}</span>
-                </div>
+            <div class="text-[11px] text-slate-600 space-y-0.5">
+                <div>👤 ឈ្មោះ៖ <b>${o.userName || 'N/A'}</b></div>
+                <div>📞 ទំនាក់ទំនង៖ <b>${o.contact}</b></div>
+                <div>🧾 Trans ID: <b class="font-mono text-slate-800">${o.transId}</b></div>
+                <div class="text-[10px] text-slate-400">🕒 ថ្ងៃខែ៖ ${o.date}</div>
             </div>
-
-            <div class="flex justify-end pt-1">
-                <button onclick="deleteSingleOrder(${index})" class="text-[11px] text-rose-500 hover:text-rose-700 font-bold flex items-center gap-1">
-                    <i class="fa-solid fa-trash"></i> លុបការបញ្ជាទិញនេះ
+            <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+                <select onchange="updateOrderStatus(${index}, this.value)" class="text-xs font-bold border rounded-lg px-2 py-1 bg-white focus:outline-none">
+                    <option value="Pending" ${o.status === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
+                    <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>✅ Completed</option>
+                    <option value="Cancelled" ${o.status === 'Cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                </select>
+                <button onclick="deleteSingleOrder(${index})" class="text-[11px] text-rose-500 hover:underline font-bold">
+                    <i class="fa-solid fa-trash"></i> លុប
                 </button>
             </div>
         </div>
     `).join('');
 }
 
-// Update Status (Pending / Completed / Cancelled)
+function renderAdminUsers() {
+    const container = document.getElementById('adminUserList');
+    let users = JSON.parse(localStorage.getItem('store_users') || '[]');
+
+    if (users.length === 0) {
+        container.innerHTML = `<p class="text-xs font-bold text-slate-400 text-center py-6">មិនទាន់មានអតិថិជនចុះឈ្មោះទេ</p>`;
+        return;
+    }
+
+    container.innerHTML = users.map(u => `
+        <div class="border border-slate-200 rounded-xl p-2.5 bg-slate-50 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold text-slate-800">${u.name}</p>
+                <p class="text-[11px] text-slate-500"><i class="fa-solid fa-phone text-[9px] mr-1"></i>${u.phone}</p>
+            </div>
+            <span class="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">Customer</span>
+        </div>
+    `).join('');
+}
+
 function updateOrderStatus(index, newStatus) {
     let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
     orders[index].status = newStatus;
@@ -487,9 +485,8 @@ function updateOrderStatus(index, newStatus) {
     renderAdminOrders();
 }
 
-// Delete Order
 function deleteSingleOrder(index) {
-    if (confirm('តើអ្នកប្រាកដថាលុបការបញ្ជាទិញនេះ?')) {
+    if (confirm('តើអ្នកប្រាកដថាលុប Order នេះ?')) {
         let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
         orders.splice(index, 1);
         localStorage.setItem('user_orders', JSON.stringify(orders));
@@ -497,35 +494,9 @@ function deleteSingleOrder(index) {
     }
 }
 
-// Clear All
 function clearAllOrders() {
-    if (confirm('តើអ្នកប្រាកដថាលុបទិន្នន័យបញ្ជាទិញទាំងអស់?')) {
+    if (confirm('តើអ្នកប្រាកដថាលុប Order ទាំងអស់?')) {
         localStorage.removeItem('user_orders');
         renderAdminOrders();
     }
 }
-
-// កែប្រែអនុវត្តបន្ថែមក្នុង handleOrderSubmit ដើម្បីរក្សាទុកព័ត៌មានអតិថិជន និង Status ចូល LocalStorage
-const originalHandleOrderSubmit = handleOrderSubmit;
-handleOrderSubmit = async function(e) {
-    e.preventDefault();
-    const user = JSON.parse(localStorage.getItem('store_user') || '{}');
-    const transId = document.getElementById('transId').value.trim();
-
-    // បន្ថែម Order ចូល Storage ជាមួយព័ត៌មានលម្អិត
-    let orders = JSON.parse(localStorage.getItem('user_orders') || '[]');
-    orders.unshift({
-        plan: currentPlanName,
-        price: finalPrice,
-        transId: transId,
-        userName: user.name || 'N/A',
-        userContact: user.contact || 'N/A',
-        userType: user.type || 'N/A',
-        status: 'Pending',
-        date: new Date().toLocaleString('km-KH')
-    });
-    localStorage.setItem('user_orders', JSON.stringify(orders));
-
-    // ដំណើរការផ្ញើសារចូល Telegram
-    await originalHandleOrderSubmit(e);
-};
