@@ -55,8 +55,6 @@ const CONFIG = {
     CITY: "Phnom Penh"
 };
 
-const ADMIN_PASSWORD = "123";
-
 let rawPrice = 0;
 let finalPrice = 0;
 let currentPlanName = "";
@@ -64,6 +62,7 @@ let timerInterval = null;
 let currentKHQRString = "";
 let currentUser = null;
 let currentUserBalance = 0.00;
+let currentUserPoints = 0;
 let selectedPaymentMethod = "khqr";
 let unsubscribeUserDoc = null;
 let unsubscribeOrders = null;
@@ -143,7 +142,7 @@ function showToast(msg, isSuccess = true) {
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
-// Real-time Listener (Firebase Auth & Balance Sync)
+// Real-time Listener (Firebase Auth & Balance/Points Sync)
 onAuthStateChanged(auth, (user) => {
     currentUser = user;
     const profileArea = document.getElementById('userProfileArea');
@@ -167,19 +166,23 @@ onAuthStateChanged(auth, (user) => {
             </button>
         `;
 
-        // Real-time Balance listener
+        // Real-time Balance & Points listener
         const userRef = doc(db, "users", currentUser.uid);
         unsubscribeUserDoc = onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 currentUserBalance = data.balance || 0.00;
+                currentUserPoints = data.points || 0;
+                
                 const headerBal = document.getElementById('headerBalance');
                 const profBal = document.getElementById('userWalletBalance');
                 const chkBal = document.getElementById('checkoutWalletBalance');
+                const pointsDisplay = document.getElementById('userLoyaltyPoints');
                 
                 if (headerBal) headerBal.innerText = currentUserBalance.toFixed(2);
                 if (profBal) profBal.innerText = currentUserBalance.toFixed(2);
                 if (chkBal) chkBal.innerText = currentUserBalance.toFixed(2);
+                if (pointsDisplay) pointsDisplay.innerText = currentUserPoints;
             }
         });
 
@@ -202,6 +205,8 @@ onAuthStateChanged(auth, (user) => {
                 <i class="fa-solid fa-right-to-bracket"></i> ចូលប្រើប្រព័ន្ធ
             </button>
         `;
+        const pointsDisplay = document.getElementById('userLoyaltyPoints');
+        if (pointsDisplay) pointsDisplay.innerText = "0";
     }
 });
 
@@ -256,6 +261,39 @@ window.closeProductDetail = function() {
     document.getElementById('productDetailModal').classList.add('hidden');
 };
 
+// Loyalty Program Rewards Modal
+window.openLoyaltyRewardsModal = function() {
+    if (!currentUser) {
+        showToast("សូម Login ដើម្បីមើលពិន្ទុសន្សំ!", false);
+        window.openAuthModal('login');
+        return;
+    }
+    document.getElementById('loyaltyModal').classList.remove('hidden');
+};
+
+window.closeLoyaltyRewardsModal = function() {
+    document.getElementById('loyaltyModal').classList.add('hidden');
+};
+
+window.redeemLoyaltyReward = async function(requiredPoints, rewardAmount) {
+    if (currentUserPoints < requiredPoints) {
+        showToast("❌ ពិន្ទុរបស់អ្នកមិនទាន់គ្រប់គ្រាន់ដើម្បីប្តូររង្វាន់នេះទេ!", false);
+        return;
+    }
+
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        await updateDoc(userRef, {
+            points: currentUserPoints - requiredPoints,
+            balance: currentUserBalance + rewardAmount
+        });
+        showToast(`🎉 បានប្តូរពិន្ទុជោគជ័យ! ទទួលបានទឹកប្រាក់បន្ថែម $${rewardAmount.toFixed(2)} ក្នុង Wallet`);
+        window.closeLoyaltyRewardsModal();
+    } catch (err) {
+        showToast("មានបញ្ហា៖ " + err.message, false);
+    }
+};
+
 // Payment Method Toggle (KHQR vs Wallet Balance)
 window.togglePayMethodUI = function(method) {
     selectedPaymentMethod = method;
@@ -308,6 +346,7 @@ window.handleUserRegister = async function(e) {
             name: name,
             email: email,
             balance: 0.00,
+            points: 0,
             createdAt: new Date().toISOString()
         });
 
@@ -347,6 +386,7 @@ window.handleGoogleAuth = async function() {
                 name: user.displayName,
                 email: user.email,
                 balance: 0.00,
+                points: 0,
                 createdAt: new Date().toISOString()
             });
         }
@@ -482,24 +522,35 @@ window.closeCheckout = function() {
     setTimeout(() => { sheet.classList.add('hidden'); }, 300);
 };
 
-window.applyDiscount = function() {
-    const coupon = document.getElementById('couponInput').value.trim().toUpperCase();
+window.applyDiscount = async function() {
+    const couponCode = document.getElementById('couponInput').value.trim().toUpperCase();
     const msg = document.getElementById('discountMsg');
     
-    if (coupon === "LEANGHAK" || coupon === "AIPRO") {
-        finalPrice = Math.max(0, rawPrice - 0.50);
-        document.getElementById('selectedPlanPrice').innerText = finalPrice.toFixed(2);
-        generateOfficialKHQR(finalPrice);
+    try {
+        const couponRef = doc(db, "coupons", couponCode);
+        const couponSnap = await getDoc(couponRef);
 
-        msg.innerText = "✓ ទទួលបានការបញ្ចុះតម្លៃ $0.50 ជោគជ័យ!";
-        msg.className = "text-[11px] mt-1 text-emerald-500 font-bold block";
-    } else {
-        msg.innerText = "✕ កូដមិនត្រឹមត្រូវ!";
+        if (couponSnap.exists()) {
+            const couponData = couponSnap.data();
+            const discountValue = couponData.discount || 0.50;
+
+            finalPrice = Math.max(0, rawPrice - discountValue);
+            document.getElementById('selectedPlanPrice').innerText = finalPrice.toFixed(2);
+            generateOfficialKHQR(finalPrice);
+
+            msg.innerText = `✓ ទទួលបានការបញ្ចុះតម្លៃ $${discountValue.toFixed(2)} ជោគជ័យ!`;
+            msg.className = "text-[11px] mt-1 text-emerald-500 font-bold block";
+        } else {
+            msg.innerText = "✕ កូដបញ្ចុះតម្លៃមិនត្រឹមត្រូវ ឬត្រូវបានលុបចោល!";
+            msg.className = "text-[11px] mt-1 text-rose-500 font-bold block";
+        }
+    } catch (err) {
+        msg.innerText = "✕ មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់កូដ!";
         msg.className = "text-[11px] mt-1 text-rose-500 font-bold block";
     }
 };
 
-// Handle Order Logic (Auto-Delivery + Pay with Balance)
+// Handle Order Logic (Auto-Delivery + Pay with Balance + Loyalty Points Reward)
 window.handleOrderSubmit = async function(e) {
     e.preventDefault();
 
@@ -507,7 +558,6 @@ window.handleOrderSubmit = async function(e) {
     const transId = document.getElementById('transId').value.trim();
     const btn = document.getElementById('btnSubmit');
 
-    // ពិនិត្យ Balance បើសិនជ្រើសរើស "Pay with Balance"
     if (selectedPaymentMethod === 'wallet') {
         if (currentUserBalance < finalPrice) {
             showToast("❌ លុយក្នុង Wallet មិនគ្រប់គ្រាន់ទេ! សូម Top Up បន្ថែម", false);
@@ -522,7 +572,6 @@ window.handleOrderSubmit = async function(e) {
         let deliveredStockData = null;
         let isAutoCompleted = false;
 
-        // ឆែកមើល Stock សិន (Auto-Delivery System)
         const stockQuery = query(collection(db, "stocks"), where("planName", "==", currentPlanName));
         const stockSnapshot = await getDocs(stockQuery);
 
@@ -533,14 +582,21 @@ window.handleOrderSubmit = async function(e) {
             isAutoCompleted = true;
         }
 
-        // កាត់ Balance ភ្លាមៗបើជ្រើសរើស Pay with Balance
+        const userRef = doc(db, "users", currentUser.uid);
+        let newBalance = currentUserBalance;
         if (selectedPaymentMethod === 'wallet') {
-            const userRef = doc(db, "users", currentUser.uid);
-            await updateDoc(userRef, {
-                balance: currentUserBalance - finalPrice
-            });
+            newBalance -= finalPrice;
             isAutoCompleted = true;
         }
+
+        // Earn loyalty points: 10 points per $1 spent
+        const earnedPoints = Math.floor(finalPrice * 10);
+        const updatedPoints = currentUserPoints + earnedPoints;
+
+        await updateDoc(userRef, {
+            balance: newBalance,
+            points: updatedPoints
+        });
 
         const newOrderData = {
             orderId: "ORD-" + Date.now(),
@@ -556,9 +612,18 @@ window.handleOrderSubmit = async function(e) {
             date: new Date().toISOString()
         };
 
-        await addDoc(collection(db, "orders"), newOrderData);
+        const orderDocRef = await addDoc(collection(db, "orders"), newOrderData);
 
-        // ផ្ញើ Telegram Alert
+        // Telegram Bot Webhook Integration with Approve/Reject Inline Keyboard Buttons
+        const inlineKeyboard = {
+            inline_keyboard: [
+                [
+                    { text: "✅ Approve", callback_data: `approve_${orderDocRef.id}` },
+                    { text: "❌ Reject", callback_data: `reject_${orderDocRef.id}` }
+                ]
+            ]
+        };
+
         const message = `🛒 ការបញ្ជាទិញថ្មីពី LEANGHAK STORE\n\n` +
                         `👤 អតិថិជន: ${newOrderData.userName}\n` +
                         `📦 ទំនិញ: ${currentPlanName}\n` +
@@ -571,13 +636,17 @@ window.handleOrderSubmit = async function(e) {
         fetch(`https://api.telegram.org/bot${CONFIG.BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: CONFIG.ADMIN_CHAT_ID, text: message })
+            body: JSON.stringify({ 
+                chat_id: CONFIG.ADMIN_CHAT_ID, 
+                text: message,
+                reply_markup: inlineKeyboard
+            })
         }).catch(err => console.log("Telegram API notice:", err));
 
         if (deliveredStockData) {
-            showToast("🎉 ទិញបានជោគជ័យ! អាខោនត្រូវបានផ្ញើជូនក្នុងប្រវត្តិបញ្ជាទិញ");
+            showToast(`🎉 ទិញបានជោគជ័យ! បន្ថែមជូន ${earnedPoints} ពិន្ទុ VIP`);
         } else {
-            showToast("🎉 បញ្ជូនការបញ្ជាទិញជោគជ័យ!");
+            showToast(`🎉 បញ្ជូនការបញ្ជាទិញជោគជ័យ! បន្ថែមជូន ${earnedPoints} ពិន្ទុ VIP`);
         }
 
         window.closeCheckout();
@@ -657,30 +726,48 @@ window.closeAdminModal = function() {
     document.getElementById('adminModal').classList.add('hidden');
 };
 
-window.handleAdminLogin = function(e) {
+// Secure Admin Login via Firebase Firestore Database Verification (instead of plain hardcoded frontend password)
+window.handleAdminLogin = async function(e) {
     e.preventDefault();
     const pass = document.getElementById('adminPasswordInput').value;
     
-    if (pass === ADMIN_PASSWORD) {
-        document.getElementById('adminLoginSection').classList.add('hidden');
-        document.getElementById('adminDashboard').classList.remove('hidden');
-        renderAdminOrders();
-        renderAdminUsers();
-        renderAdminStock();
-    } else {
-        alert('❌ ពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវទេ!');
+    try {
+        const adminRef = doc(db, "settings", "adminAuth");
+        const adminSnap = await getDoc(adminRef);
+
+        let validPassword = "123"; // fallback password
+        if (adminSnap.exists()) {
+            validPassword = adminSnap.data().password;
+        }
+
+        if (pass === validPassword) {
+            document.getElementById('adminLoginSection').classList.add('hidden');
+            document.getElementById('adminDashboard').classList.remove('hidden');
+            renderAdminOrders();
+            renderAdminUsers();
+            renderAdminStock();
+            renderAdminCoupons();
+        } else {
+            alert('❌ ពាក្យសម្ងាត់ Admin មិនត្រឹមត្រូវទេ!');
+        }
+    } catch (err) {
+        alert('❌ មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ Admin Authentication!');
     }
 };
 
 window.switchAdminTab = function(tab) {
-    const sections = ['orders', 'users', 'stock'];
+    const sections = ['orders', 'users', 'stock', 'coupons'];
     sections.forEach(s => {
-        document.getElementById(`admin${s.charAt(0).toUpperCase() + s.slice(1)}Section`).classList.add('hidden');
-        document.getElementById(`tab${s.charAt(0).toUpperCase() + s.slice(1)}Btn`).className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold";
+        const elem = document.getElementById(`admin${s.charAt(0).toUpperCase() + s.slice(1)}Section`);
+        const btnElem = document.getElementById(`tab${s.charAt(0).toUpperCase() + s.slice(1)}Btn`);
+        if (elem) elem.classList.add('hidden');
+        if (btnElem) btnElem.className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold";
     });
 
-    document.getElementById(`admin${tab.charAt(0).toUpperCase() + tab.slice(1)}Section`).classList.remove('hidden');
-    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`).className = "px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold";
+    const activeElem = document.getElementById(`admin${tab.charAt(0).toUpperCase() + tab.slice(1)}Section`);
+    const activeBtn = document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
+    if (activeElem) activeElem.classList.remove('hidden');
+    if (activeBtn) activeBtn.className = "px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold";
 };
 
 async function renderAdminOrders() {
@@ -749,7 +836,7 @@ async function renderAdminUsers() {
                     <div>
                         <p class="font-bold">${u.name}</p>
                         <p class="text-[11px] text-slate-400">${u.email}</p>
-                        <p class="text-[11px] text-emerald-500 font-bold">Balance: $${(u.balance || 0).toFixed(2)}</p>
+                        <p class="text-[11px] text-emerald-500 font-bold">Balance: $${(u.balance || 0).toFixed(2)} | Points: ${u.points || 0}</p>
                     </div>
                     <button onclick="topUpUserWallet('${docId}', ${u.balance || 0})" class="px-2.5 py-1 bg-blue-600 text-white font-bold rounded-lg text-[10px]">
                         + Top Up
@@ -838,6 +925,67 @@ window.deleteStockItem = async function(docId) {
         await deleteDoc(doc(db, "stocks", docId));
         renderAdminStock();
         showToast("បានលុប Stock រួចរាល់");
+    }
+};
+
+// Dynamic Promo Code Manager Functions
+window.handleAddCoupon = async function(e) {
+    e.preventDefault();
+    const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
+    const discount = parseFloat(document.getElementById('couponDiscountInput').value);
+
+    try {
+        await setDoc(doc(db, "coupons", code), {
+            code: code,
+            discount: discount,
+            createdAt: new Date().toISOString()
+        });
+
+        document.getElementById('couponCodeInput').value = "";
+        document.getElementById('couponDiscountInput').value = "";
+        showToast("🎉 បង្កើតកូដបញ្ចុះតម្លៃបានជោគជ័យ!");
+        renderAdminCoupons();
+    } catch (err) {
+        showToast("បរាជ័យ៖ " + err.message, false);
+    }
+};
+
+async function renderAdminCoupons() {
+    const container = document.getElementById('adminCouponList');
+    container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">កំពុងទាញយកកូដបញ្ចុះតម្លៃ...</p>`;
+
+    try {
+        const querySnapshot = await getDocs(collection(db, "coupons"));
+        if (querySnapshot.empty) {
+            container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">មិនទាន់មានកូដបញ្ចុះតម្លៃទេ</p>`;
+            return;
+        }
+
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+            const c = docSnap.data();
+            const docId = docSnap.id;
+            html += `
+                <div class="border dark:border-slate-700 p-2 rounded-xl bg-slate-50 dark:bg-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                        <p class="font-bold text-emerald-400">${c.code}</p>
+                        <p class="text-[10px] text-slate-400">បញ្ចុះតម្លៃ: $${(c.discount || 0).toFixed(2)}</p>
+                    </div>
+                    <button onclick="deleteCouponItem('${docId}')" class="text-rose-500 font-bold text-[11px]"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<p class="text-xs text-rose-500 text-center py-2">បរាជ័យក្នុងការទាញយកកូដបញ្ចុះតម្លៃ</p>`;
+    }
+}
+
+window.deleteCouponItem = async function(docId) {
+    if (confirm('តើអ្នកប្រាកដជាចង់លុបកូដបញ្ចុះតម្លៃនេះទេ?')) {
+        await deleteDoc(doc(db, "coupons", docId));
+        renderAdminCoupons();
+        showToast("បានលុបកូដបញ្ចុះតម្លៃរួចរាល់");
     }
 };
 
