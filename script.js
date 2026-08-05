@@ -41,9 +41,13 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const tg = window.Telegram?.WebApp;
+let telegramUser = null;
 if (tg) {
     tg.ready();
     tg.expand();
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        telegramUser = tg.initDataUnsafe.user;
+    }
 }
 
 const CONFIG = {
@@ -87,7 +91,7 @@ function formatTLV(tag, value) {
     return `${tag}${len}${value}`;
 }
 
-function generateOfficialKHQR(amount) {
+function generateOfficialKHQR(amount, imgElementId = 'qrCodeImg') {
     const globalID = formatTLV("00", "kh.gov.nbc.bakong");
     const accountID = formatTLV("01", CONFIG.ACCOUNT_ID);
     const merchantAccInfo = formatTLV("29", globalID + accountID);
@@ -109,8 +113,14 @@ function generateOfficialKHQR(amount) {
     const crc = calculateCRC16(rawKHQR);
     currentKHQRString = rawKHQR + crc;
 
-    document.getElementById('qrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentKHQRString)}`;
-    document.getElementById('abaDeepLink').href = `abamobilebank://qr?code=${encodeURIComponent(currentKHQRString)}`;
+    const qrImg = document.getElementById(imgElementId);
+    if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentKHQRString)}`;
+    }
+    if (imgElementId === 'qrCodeImg') {
+        const abaLink = document.getElementById('abaDeepLink');
+        if (abaLink) abaLink.href = `abamobilebank://qr?code=${encodeURIComponent(currentKHQRString)}`;
+    }
 }
 
 function startTimer(durationInSeconds) {
@@ -142,6 +152,147 @@ function showToast(msg, isSuccess = true) {
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
+// Telegram Account Link Feature
+window.linkTelegramAccount = function() {
+    if (!currentUser) {
+        showToast("សូម Login ចូលប្រព័ន្ធមុននឹងភ្ជាប់ Telegram!", false);
+        window.openAuthModal('login');
+        return;
+    }
+    if (telegramUser) {
+        showToast(`🎉 បានតភ្ជាប់ជាមួយ Telegram ៖ @${telegramUser.username || telegramUser.first_name}`);
+        document.getElementById('tgStatusText').innerText = `@${telegramUser.username || telegramUser.first_name}`;
+    } else {
+        showToast("សូមបើកដំណើរការវេបសាយនេះតាមរយៈ Telegram Bot របស់អ្នក!", false);
+    }
+};
+
+// Top-Up Wallet via QR Scan Feature
+window.openTopUpModal = function() {
+    if (!currentUser) {
+        showToast("សូម Login ដើម្បីដាក់ប្រាក់ចូល Wallet!", false);
+        window.openAuthModal('login');
+        return;
+    }
+    document.getElementById('topUpAmountInput').value = "5.00";
+    setTopUpAmount(5);
+    document.getElementById('topUpModal').classList.remove('hidden');
+};
+
+window.closeTopUpModal = function() {
+    document.getElementById('topUpModal').classList.add('hidden');
+};
+
+window.setTopUpAmount = function(val) {
+    document.getElementById('topUpAmountInput').value = val.toFixed(2);
+    generateOfficialKHQR(val, 'topUpQrImg');
+};
+
+window.updateTopUpQR = function(val) {
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+        generateOfficialKHQR(num, 'topUpQrImg');
+    }
+};
+
+window.submitTopUp = async function() {
+    const amount = parseFloat(document.getElementById('topUpAmountInput').value);
+    const transId = document.getElementById('topUpTransId').value.trim();
+
+    if (isNaN(amount) || amount <= 0) {
+        showToast("សូមបញ្ចូលទឹកប្រាក់ឱ្យបានត្រឹមត្រូវ!", false);
+        return;
+    }
+    if (!transId) {
+        showToast("សូមបញ្ចូលលេខកូដប្រតិបត្តិការ (Transaction ID)!", false);
+        return;
+    }
+
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        await updateDoc(userRef, {
+            balance: currentUserBalance + amount
+        });
+
+        // Save TopUp Record to Orders for tracking
+        await addDoc(collection(db, "orders"), {
+            orderId: "TOPUP-" + Date.now(),
+            userEmail: currentUser.email,
+            userName: currentUser.displayName || currentUser.email,
+            plan: `Top Up Wallet ($${amount.toFixed(2)})`,
+            price: amount,
+            contact: currentUser.email,
+            transId: transId,
+            payMethod: 'khqr-topup',
+            status: 'Completed',
+            date: new Date().toISOString()
+        });
+
+        showToast(`🎉 ដាក់ប្រាក់ចំនួន $${amount.toFixed(2)} ចូល Wallet ជោគជ័យ!`);
+        window.closeTopUpModal();
+    } catch (err) {
+        showToast("មានបញ្ហា៖ " + err.message, false);
+    }
+};
+
+// Load Store Products dynamically from Firestore
+async function loadStoreProducts() {
+    const container = document.getElementById('productList');
+    try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        if (querySnapshot.empty) {
+            await seedDefaultProducts();
+            loadStoreProducts();
+            return;
+        }
+
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+            const p = docSnap.data();
+            const isBestValue = p.badge && p.badge.includes('BEST VALUE');
+            
+            html += `
+                <div class="product-item glass-card rounded-3xl p-5 ${isBestValue ? 'border-2 border-blue-500 shadow-2xl relative overflow-hidden' : 'border border-white/60 dark:border-white/10 shadow-xl'} transition-all duration-300 hover:scale-[1.01]" data-category="${p.category}" data-title="${p.title.toLowerCase()}">
+                    ${p.badge ? `<div class="absolute top-0 right-0 bg-gradient-to-l from-blue-600 to-violet-600 text-white text-[9px] font-black px-3.5 py-1 rounded-bl-2xl uppercase">${p.badge}</div>` : ''}
+                    <div class="flex justify-between items-start mb-2 ${isBestValue ? 'mt-1' : ''}">
+                        <div>
+                            <span class="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase">${p.category.toUpperCase()}</span>
+                            <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1.5">${p.title}</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><i class="fa-solid fa-wand-magic-sparkles text-emerald-500 mr-1"></i>${p.subtitle}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-black text-blue-600 dark:text-blue-400">$${p.price.toFixed(2)}</span>
+                            ${p.oldPrice ? `<p class="text-[10px] text-slate-400 line-through font-bold">$${p.oldPrice.toFixed(2)}</p>` : '<p class="text-[10px] text-slate-400 font-bold">/ កញ្ចប់</p>'}
+                        </div>
+                    </div>
+                    <button onclick="openProductDetail('${p.title}', '${p.price}', '${p.device}', '${p.warranty}', '${p.login}')" class="text-[11px] text-blue-500 hover:underline font-bold mb-3 inline-block">
+                        <i class="fa-solid fa-circle-info mr-1"></i>មើលលក្ខខណ្ឌ & របៀបប្រើ
+                    </button>
+                    <button onclick="openCheckout('${p.title}', ${p.price})" class="w-full ${isBestValue ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 glow-effect' : 'bg-slate-900 dark:bg-blue-600 hover:bg-blue-600'} text-white py-3 rounded-2xl font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2">
+                        <span>ទិញកញ្ចប់នេះ</span>
+                        <i class="fa-solid fa-cart-shopping text-[10px]"></i>
+                    </button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<p class="text-xs text-rose-500 text-center py-6">មានបញ្ហាក្នុងការទាញយកផលិតផល</p>`;
+    }
+}
+
+async function seedDefaultProducts() {
+    const defaults = [
+        { title: "ChatGPT Plus (GPT-4o)", price: 4.50, oldPrice: null, category: "ai", badge: "Most Popular", subtitle: "DALL-E, Web Browsing & Canvas", device: "1 ឧបករណ៍ (Shared Mail)", warranty: "ធានារយៈពេល 29 ថ្ងៃពេញ", login: "Mail/Password ឬ Cookie" },
+        { title: "Microsoft Office 2021 Pro Plus", price: 8.50, oldPrice: 15.00, category: "software", badge: "Official License", subtitle: "Word, Excel, PPT, Outlook (Lifetime)", device: "1 PC (Windows)", warranty: "ធានាពេញមួយជីវិត", login: "Product Key សម្រាប់ Kفعیل" },
+        { title: "Adobe Photoshop & Premiere 2024", price: 12.00, oldPrice: 25.00, category: "software", badge: "🔥 BEST VALUE", subtitle: "Pre-activated Version (Full Features)", device: "1 PC / Laptop", warranty: "ធានា ១ ឆ្នាំពេញ", login: "Direct Download & Install" },
+        { title: "CapCut Pro - 1 ខែ", price: 3.00, oldPrice: null, category: "video", badge: "Video Editing", subtitle: "ប្រើបាន 30 ថ្ងៃ (PC & Phone)", device: "1 PC + 1 Phone", warranty: "ធានា 30 ថ្ងៃ", login: "អាខោន Upgrade រួចជាស្រេច" }
+    ];
+    for (let p of defaults) {
+        await addDoc(collection(db, "products"), p);
+    }
+}
+
 // Real-time Listener (Firebase Auth & Balance/Points Sync)
 onAuthStateChanged(auth, (user) => {
     currentUser = user;
@@ -152,7 +303,7 @@ onAuthStateChanged(auth, (user) => {
 
     if (currentUser) {
         profileArea.innerHTML = `
-            <div onclick="openProfileModal()" class="flex items-center gap-2 cursor-pointer hover:opacity-85">
+            <div onclick="openProfileModal()" class="flex items-center gap-2 cursor-pointer hover:opacity-85 transition">
                 <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
                     ${(currentUser.displayName || currentUser.email).charAt(0).toUpperCase()}
                 </div>
@@ -161,12 +312,15 @@ onAuthStateChanged(auth, (user) => {
                     <span class="text-[9px] text-emerald-400 font-bold">$<span id="headerBalance">0.00</span></span>
                 </div>
             </div>
-            <button onclick="handleLogout()" class="ml-2 text-xs text-rose-400 hover:text-rose-300 font-bold">
+            <button onclick="handleLogout()" class="ml-2 text-xs text-rose-400 hover:text-rose-300 font-bold transition">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </button>
         `;
 
-        // Real-time Balance & Points listener
+        if (telegramUser) {
+            document.getElementById('tgStatusText').innerText = `@${telegramUser.username || telegramUser.first_name}`;
+        }
+
         const userRef = doc(db, "users", currentUser.uid);
         unsubscribeUserDoc = onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -186,7 +340,6 @@ onAuthStateChanged(auth, (user) => {
             }
         });
 
-        // Real-time Order Approval Notification
         const q = query(collection(db, "orders"), where("userEmail", "==", currentUser.email));
         unsubscribeOrders = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
@@ -201,7 +354,7 @@ onAuthStateChanged(auth, (user) => {
 
     } else {
         profileArea.innerHTML = `
-            <button onclick="openAuthModal('login')" class="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5">
+            <button onclick="openAuthModal('login')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-right-to-bracket"></i> ចូលប្រើប្រព័ន្ធ
             </button>
         `;
@@ -234,9 +387,9 @@ window.filterProducts = function() {
 
 window.setCategory = function(cat) {
     document.querySelectorAll('.cat-btn').forEach(btn => {
-        btn.className = "cat-btn bg-white/10 text-slate-300 hover:bg-white/20 px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap";
+        btn.className = "cat-btn bg-white/10 text-slate-300 hover:bg-white/20 px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition";
     });
-    document.getElementById(`cat-${cat}`).className = "cat-btn bg-blue-600 text-white px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap shadow-sm";
+    document.getElementById(`cat-${cat}`).className = "cat-btn bg-blue-600 text-white px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap shadow-sm transition";
 
     const items = document.querySelectorAll('.product-item');
     items.forEach(item => {
@@ -294,7 +447,7 @@ window.redeemLoyaltyReward = async function(requiredPoints, rewardAmount) {
     }
 };
 
-// Payment Method Toggle (KHQR vs Wallet Balance)
+// Payment Method Toggle
 window.togglePayMethodUI = function(method) {
     selectedPaymentMethod = method;
     const khqrContainer = document.getElementById('khqrContainer');
@@ -405,10 +558,8 @@ window.handleLogout = async function() {
 
 window.openProfileModal = function() {
     if (!currentUser) return;
-    
     document.getElementById('profileNameInput').value = currentUser.displayName || "";
     document.getElementById('profileEmailInput').value = currentUser.email || "";
-    
     document.getElementById('profileModal').classList.remove('hidden');
     loadUserSubscriptions();
 };
@@ -423,7 +574,6 @@ window.handleUpdateProfile = async function(e) {
 
     try {
         await updateProfile(currentUser, { displayName: newName });
-        
         const userRef = doc(db, "users", currentUser.uid);
         await updateDoc(userRef, { name: newName });
 
@@ -439,10 +589,7 @@ async function loadUserSubscriptions() {
     container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">កំពុងទាញយក...</p>`;
 
     try {
-        const q = query(
-            collection(db, "orders"), 
-            where("userEmail", "==", currentUser.email)
-        );
+        const q = query(collection(db, "orders"), where("userEmail", "==", currentUser.email));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
@@ -453,10 +600,9 @@ async function loadUserSubscriptions() {
         let html = '';
         querySnapshot.forEach((docSnap) => {
             const o = docSnap.data();
-            if (o.status === 'Completed') {
+            if (o.status === 'Completed' && !o.plan.includes('Top Up')) {
                 const orderDate = new Date(o.date);
                 const daysToAdd = o.plan.includes('1 ឆ្នាំ') ? 365 : 30;
-                
                 const expiryDate = new Date(orderDate);
                 expiryDate.setDate(expiryDate.getDate() + daysToAdd);
                 
@@ -550,7 +696,6 @@ window.applyDiscount = async function() {
     }
 };
 
-// Handle Order Logic (Auto-Delivery + Pay with Balance + Loyalty Points Reward)
 window.handleOrderSubmit = async function(e) {
     e.preventDefault();
 
@@ -558,11 +703,9 @@ window.handleOrderSubmit = async function(e) {
     const transId = document.getElementById('transId').value.trim();
     const btn = document.getElementById('btnSubmit');
 
-    if (selectedPaymentMethod === 'wallet') {
-        if (currentUserBalance < finalPrice) {
-            showToast("❌ លុយក្នុង Wallet មិនគ្រប់គ្រាន់ទេ! សូម Top Up បន្ថែម", false);
-            return;
-        }
+    if (selectedPaymentMethod === 'wallet' && currentUserBalance < finalPrice) {
+        showToast("❌ លុយក្នុង Wallet មិនគ្រប់គ្រាន់ទេ! សូម Top Up បន្ថែម", false);
+        return;
     }
 
     btn.disabled = true;
@@ -589,7 +732,6 @@ window.handleOrderSubmit = async function(e) {
             isAutoCompleted = true;
         }
 
-        // Earn loyalty points: 10 points per $1 spent
         const earnedPoints = Math.floor(finalPrice * 10);
         const updatedPoints = currentUserPoints + earnedPoints;
 
@@ -614,7 +756,6 @@ window.handleOrderSubmit = async function(e) {
 
         const orderDocRef = await addDoc(collection(db, "orders"), newOrderData);
 
-        // Telegram Bot Webhook Integration with Approve/Reject Inline Keyboard Buttons
         const inlineKeyboard = {
             inline_keyboard: [
                 [
@@ -643,12 +784,7 @@ window.handleOrderSubmit = async function(e) {
             })
         }).catch(err => console.log("Telegram API notice:", err));
 
-        if (deliveredStockData) {
-            showToast(`🎉 ទិញបានជោគជ័យ! បន្ថែមជូន ${earnedPoints} ពិន្ទុ VIP`);
-        } else {
-            showToast(`🎉 បញ្ជូនការបញ្ជាទិញជោគជ័យ! បន្ថែមជូន ${earnedPoints} ពិន្ទុ VIP`);
-        }
-
+        showToast(`🎉 ទិញបានជោគជ័យ! បន្ថែមជូន ${earnedPoints} ពិន្ទុ VIP`);
         window.closeCheckout();
 
     } catch (err) {
@@ -697,7 +833,7 @@ window.openHistoryModal = async function() {
                     </div>
                     ${o.deliveredData ? `
                         <div class="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-[11px] font-mono text-emerald-600 dark:text-emerald-400 select-text">
-                            <strong>🔑 Account Stock:</strong><br>${o.deliveredData.replace(/\n/g, '<br>')}
+                            <strong>🔑 Delivery Details:</strong><br>${o.deliveredData.replace(/\n/g, '<br>')}
                         </div>
                     ` : ''}
                 </div>
@@ -716,6 +852,7 @@ window.closeHistoryModal = function() {
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('supportBtn').href = `https://t.me/${CONFIG.ADMIN_USERNAME.replace('https://t.me/', '')}`;
     document.getElementById('khqrAccName').innerText = CONFIG.MERCHANT_NAME;
+    loadStoreProducts();
 });
 
 window.openAdminModal = function() {
@@ -726,7 +863,6 @@ window.closeAdminModal = function() {
     document.getElementById('adminModal').classList.add('hidden');
 };
 
-// Secure Admin Login via Firebase Firestore Database Verification (instead of plain hardcoded frontend password)
 window.handleAdminLogin = async function(e) {
     e.preventDefault();
     const pass = document.getElementById('adminPasswordInput').value;
@@ -735,14 +871,17 @@ window.handleAdminLogin = async function(e) {
         const adminRef = doc(db, "settings", "adminAuth");
         const adminSnap = await getDoc(adminRef);
 
-        let validPassword = "123"; // fallback password
+        let validPassword = "123";
         if (adminSnap.exists()) {
             validPassword = adminSnap.data().password;
+        } else {
+            await setDoc(adminRef, { password: "123" });
         }
 
         if (pass === validPassword) {
             document.getElementById('adminLoginSection').classList.add('hidden');
             document.getElementById('adminDashboard').classList.remove('hidden');
+            renderAdminProducts();
             renderAdminOrders();
             renderAdminUsers();
             renderAdminStock();
@@ -756,18 +895,83 @@ window.handleAdminLogin = async function(e) {
 };
 
 window.switchAdminTab = function(tab) {
-    const sections = ['orders', 'users', 'stock', 'coupons'];
+    const sections = ['products', 'orders', 'users', 'stock', 'coupons', 'settings'];
     sections.forEach(s => {
         const elem = document.getElementById(`admin${s.charAt(0).toUpperCase() + s.slice(1)}Section`);
         const btnElem = document.getElementById(`tab${s.charAt(0).toUpperCase() + s.slice(1)}Btn`);
         if (elem) elem.classList.add('hidden');
-        if (btnElem) btnElem.className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold";
+        if (btnElem) btnElem.className = "px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold transition whitespace-nowrap";
     });
 
     const activeElem = document.getElementById(`admin${tab.charAt(0).toUpperCase() + tab.slice(1)}Section`);
     const activeBtn = document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
     if (activeElem) activeElem.classList.remove('hidden');
-    if (activeBtn) activeBtn.className = "px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold";
+    if (activeBtn) activeBtn.className = "px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold transition whitespace-nowrap";
+};
+
+// Admin: Manage Products
+window.handleAddProduct = async function(e) {
+    e.preventDefault();
+    const title = document.getElementById('prodTitle').value.trim();
+    const price = parseFloat(document.getElementById('prodPrice').value);
+    const oldPriceVal = document.getElementById('prodOldPrice').value;
+    const oldPrice = oldPriceVal ? parseFloat(oldPriceVal) : null;
+    const category = document.getElementById('prodCategory').value;
+    const badge = document.getElementById('prodBadge').value.trim();
+    const subtitle = document.getElementById('prodSubtitle').value.trim();
+    const device = document.getElementById('prodDevice').value.trim();
+    const warranty = document.getElementById('prodWarranty').value.trim();
+    const login = document.getElementById('prodLogin').value.trim();
+
+    try {
+        await addDoc(collection(db, "products"), {
+            title, price, oldPrice, category, badge, subtitle, device, warranty, login
+        });
+        showToast("🎉 បន្ថែមផលិតផលបានជោគជ័យ!");
+        e.target.reset();
+        renderAdminProducts();
+        loadStoreProducts();
+    } catch (err) {
+        showToast("បរាជ័យ៖ " + err.message, false);
+    }
+};
+
+async function renderAdminProducts() {
+    const container = document.getElementById('adminProductList');
+    container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">កំពុងទាញយក...</p>`;
+    try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        if (querySnapshot.empty) {
+            container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">គ្មានផលិតផលទេ</p>`;
+            return;
+        }
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+            const p = docSnap.data();
+            const id = docSnap.id;
+            html += `
+                <div class="border dark:border-slate-700 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                        <p class="font-bold text-blue-400">${p.title}</p>
+                        <p class="text-[10px] text-slate-400">តម្លៃ: $${p.price.toFixed(2)} | ប្រភេទ: ${p.category}</p>
+                    </div>
+                    <button onclick="deleteProductItem('${id}')" class="text-rose-500 font-bold text-[11px]"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<p class="text-xs text-rose-500 text-center py-2">បរាជ័យក្នុងការទាញយក</p>`;
+    }
+}
+
+window.deleteProductItem = async function(id) {
+    if (confirm("លុបផលិតផលនេះចេញពីហាង?")) {
+        await deleteDoc(doc(db, "products", id));
+        renderAdminProducts();
+        loadStoreProducts();
+        showToast("លុបផលិតផលបានជោគជ័យ");
+    }
 };
 
 async function renderAdminOrders() {
@@ -803,7 +1007,7 @@ async function renderAdminOrders() {
                             <option value="Completed" ${o.status === 'Completed' ? 'selected' : ''}>✅ Completed</option>
                             <option value="Cancelled" ${o.status === 'Cancelled' ? 'selected' : ''}>❌ Cancelled</option>
                         </select>
-                        <button onclick="deleteSingleOrder('${docId}')" class="text-[11px] text-rose-500 font-bold">
+                        <button onclick="deleteSingleOrder('${docId}')" class="text-[11px] text-rose-500 font-bold hover:underline">
                             <i class="fa-solid fa-trash"></i> លុប
                         </button>
                     </div>
@@ -838,7 +1042,7 @@ async function renderAdminUsers() {
                         <p class="text-[11px] text-slate-400">${u.email}</p>
                         <p class="text-[11px] text-emerald-500 font-bold">Balance: $${(u.balance || 0).toFixed(2)} | Points: ${u.points || 0}</p>
                     </div>
-                    <button onclick="topUpUserWallet('${docId}', ${u.balance || 0})" class="px-2.5 py-1 bg-blue-600 text-white font-bold rounded-lg text-[10px]">
+                    <button onclick="topUpUserWallet('${docId}', ${u.balance || 0})" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[10px] transition">
                         + Top Up
                     </button>
                 </div>
@@ -918,7 +1122,7 @@ async function renderAdminStock() {
     } catch (err) {
         container.innerHTML = `<p class="text-xs text-rose-500 text-center py-2">បរាជ័យក្នុងការទាញយក Stock</p>`;
     }
-}
+};
 
 window.deleteStockItem = async function(docId) {
     if (confirm('លុប Stock នេះ?')) {
@@ -928,7 +1132,6 @@ window.deleteStockItem = async function(docId) {
     }
 };
 
-// Dynamic Promo Code Manager Functions
 window.handleAddCoupon = async function(e) {
     e.preventDefault();
     const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
@@ -986,6 +1189,18 @@ window.deleteCouponItem = async function(docId) {
         await deleteDoc(doc(db, "coupons", docId));
         renderAdminCoupons();
         showToast("បានលុបកូដបញ្ចុះតម្លៃរួចរាល់");
+    }
+};
+
+window.handleUpdateAdminPassword = async function(e) {
+    e.preventDefault();
+    const newPass = document.getElementById('newAdminPassword').value;
+    try {
+        await setDoc(doc(db, "settings", "adminAuth"), { password: newPass });
+        showToast("🎉 បានផ្លាស់ប្តូរពាក្យសម្ងាត់ Admin ជោគជ័យ!");
+        document.getElementById('newAdminPassword').value = "";
+    } catch (err) {
+        showToast("មានបញ្ហាក្នុងការកែប្រែ", false);
     }
 };
 
